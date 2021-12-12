@@ -111,6 +111,7 @@ venv.bak/
 # Downloaded video/audio
 *.mp4
 *.webm
+*.mp3
 
 #Pipfile
 Pipfile

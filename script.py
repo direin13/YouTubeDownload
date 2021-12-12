@@ -67,15 +67,21 @@ def interactive_mode():
             exit()
 
 
+def get_streams(url, audio_only=False, proxies=None):
+  if 'https' not in url:
+      url = 'https://www.youtube.com/watch?v=%s' % url
+  if proxies:
+      video = YouTube(url, proxies=proxies)
+  else:
+      video = YouTube(url)
+
+  print(f'{video.title}')
+  return video.streams.filter(only_audio=audio_only)
+
+
 def list_streams(url, audio_only=False, proxies=None):
-    if 'https' not in url:
-        url = 'https://www.youtube.com/watch?v=%s' % url
-    if proxies:
-        video = YouTube(url, proxies=proxies)
-    else:
-        video = YouTube(url)
-    print(f'{video.title}')
-    for stream in video.streams.filter(only_audio=audio_only).all():
+    streams = get_streams(url, audio_only, proxies)
+    for stream in streams:
         if audio_only:
             print(f'ITAG: {stream.itag}, Codec: {stream.audio_codec}, '
                   f'ABR: {stream.abr}, File Type: {stream.mime_type.split("/")[1]}')
@@ -107,6 +113,10 @@ def parse_args():
     parser.add_argument('-p', '--proxy', help='Proxy to use. Ex http://xxx.xxx.xxx:8080 '
                                               'NOTE: You need https proxy for https URL!', default=None)
     parser.add_argument('-a', '--audio-only', help='Download Audio Only', action='store_true', default=False)
+    parser.add_argument('-mp3', '--to-mp3', help='Download the audio of video and saves as an mp3. '
+                                                 'The stream with the highest resolution will be chosen for conversion '
+                                                 'by default unless itag is specified using -i/--itag', action='store_true', 
+                                                 default=False)
 
     parsed_args = parser.parse_args()
     if parsed_args.proxy:
@@ -121,8 +131,16 @@ if __name__ == '__main__':
         if args.list_streams:
             list_streams(args.url, audio_only=args.audio_only, proxies=args.proxy)
         else:
-            download_youtube_video(args.url, itag=args.itag, audio_only=args.audio_only,
+            itag = args.itag
+            if itag == None and args.to_mp3:
+                streams = [s for s in get_streams(args.url, audio_only=args.audio_only, proxies=args.proxy) if s.resolution != None and s.audio_codec != None]
+                if streams == []:
+                  print("No available streams with audio!")
+                  quit()
+                itag = max(streams, key=lambda stream: int(stream.resolution[:-1])).itag
+
+            download_youtube_video(args.url, itag=itag, audio_only=args.audio_only,
                                    output_path=args.output_path, filename=args.filename,
-                                   proxies=args.proxy)
+                                   proxies=args.proxy, to_mp3=args.to_mp3)
     else:
         interactive_mode()
